@@ -1,0 +1,60 @@
+version: "3.3"
+
+services:
+
+  sandbox-postgresql:
+    build:
+      context: ..
+      args:
+        - SANDBOX_USER_UID=999
+        - SANDBOX_DIR=/sandbox
+      dockerfile: ./docker/Dockerfile
+    container_name: sandbox-postgresql
+    image: sandbox-postgresql
+    volumes:
+      - ../backup:/app/backup
+      - ../src:/app/src
+      - docker_shared_files:/files:ro
+    ports:
+      - "9003:9003"
+    networks:
+      - docker_localhost
+    environment:
+      - SANDBOX_USER_UID=999
+      - SANDBOX_DIR=/sandbox
+    restart: on-failure
+    command: gunicorn --pythonpath '/app/src' --bind 0:9003 app.main:app --reload -w 1
+    depends_on:
+      - postgresql-db
+
+
+  postgresql-db:
+    container_name: postgresmodule-db
+    image: postgres:13
+    networks:
+      - docker_localhost
+    #volumes:
+    #  - ../postgresql-data:/var/lib/postgresql/data
+
+    ports:
+      - 5433:5433
+    expose:
+      - 5433
+    command: -p 5433
+
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: user
+      POSTGRES_DB: user
+    restart: always
+
+
+
+networks:
+  docker_localhost:
+    external: true
+
+volumes:
+  docker_shared_files:
+    external: true
