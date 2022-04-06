@@ -11,7 +11,7 @@ flask = "*"
 flask-cors = "*"
 requests = "*"
 psycopg2 = "*"
-
+marshmallow = "*"
 
 [requires]
 python_version = "3.8"
