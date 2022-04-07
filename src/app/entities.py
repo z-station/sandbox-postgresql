@@ -6,41 +6,62 @@ from dataclasses import dataclass
 class DebugData:
 
     result: List[List[str]]
-    code: Optional[str] = None
-    name: Optional[str] = None
     error: Optional[str] = None
+    name: Optional[str] = None
+    code: Optional[str] = None
+    check_code: Optional[str] = None
+    request_type: Optional[str] = None      #Select or delete
 
 
 @dataclass
-class TestData:
+class TestsData:
 
     __test__ = False
 
     data_in: Optional[str] = None
     error: Optional[str] = None
     ok: Optional[bool] = None
-
+    request_type: Optional[str] = None
 
 @dataclass
-class TestsData:
+class TestingData:
 
     __test__ = False
 
-    tests: List[TestData]
+    tests: List[TestsData]
     num: int = 0
     num_ok: int = 0
     ok: Optional[bool] = None
     code: Optional[str] = None
     name: Optional[str] = None
+    check_code: Optional[str] = None
 
+@dataclass
+class DeleteData:
+
+    name: Optional[str] = None
 
 
 @dataclass
-class TestsData:
+class CreateData:
 
-    tests: List[TestData]
-    num: int = 0
-    num_ok: int = 0
-    ok: Optional[bool] = None
-    code: Optional[str] = None
     name: Optional[str] = None
+    filename: Optional[str] = None
+    status: Optional[str] = None
+    message: Optional[str] = None
+    details: Optional[str] = None
+
+
+@dataclass
+class StatusData:
+    name: Optional[str] = None
+    status: Optional[str] = None
+
+
+@dataclass
+class StatusAllData:
+
+    status: List[StatusData]
+
+
+

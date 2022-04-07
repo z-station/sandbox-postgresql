@@ -8,7 +8,11 @@ from marshmallow import ValidationError
 from app.service.main import PostgresqlService
 from app.schema import (
     DebugSchema,
-    TestsSchema,
+    TestingSchema,
+    DeleteSchema,
+    CreateSchema,
+    StatusSchema,
+    StatusAllSchema,
     BadRequestSchema
 )
 from app.service.exceptions import ServiceException
@@ -23,31 +27,24 @@ def create_app():
         return BadRequestSchema().dump(ex), 400
 
     @app.route('/status', methods=['get'])
-    def index():
-        schema = StatusSchema()
-        try:
-            data = PostgresqlService.status_all(
-                schema.load(request.get_json())
-            )
-        except (ServiceException, ValidationError) as ex:
-            abort(400, ex)
-        else:
-            return schema.dump(data)
+    def status():
+        schema = StatusAllSchema()
+        data = PostgresqlService.status_all(
+            schema.load(request.get_json())
+        )
+        return schema.dump(data)
 
-    @app.route('/status/:name', methods=['get'])
-    def index():
+    @app.route('/status/<name>', methods=['get'])
+    def status(name):
         schema = StatusSchema()
-        try:
-            data = PostgresqlService.status(
-                schema.load(request.get_json())
-            )
-        except (ServiceException, ValidationError) as ex:
-            abort(400, ex)
-        else:
-            return schema.dump(data)
+        data = PostgresqlService.status(
+            schema.load(request.get_json()),
+            name
+        )
+        return schema.dump(data)
 
     @app.route('/create', methods=['post'])
-    def index():
+    def create():
         schema = CreateSchema()
         try:
             data = PostgresqlService.create(
@@ -58,8 +55,8 @@ def create_app():
         else:
             return schema.dump(data)
 
-    @app.route('/delete/:name', methods=['post'])
-    def index():
+    @app.route('/delete/<name>', methods=['post'])
+    def delete(name):
         schema = DeleteSchema()
         try:
             data = PostgresqlService.delete(
@@ -70,13 +67,11 @@ def create_app():
         else:
             return schema.dump(data)
 
-
-
     @app.route('/', methods=['get'])
     def index():
         return render_template("index.html")
 
-    @app.route('/debug/', methods=['post'])
+    @app.route('/debug', methods=['post'])
     def debug():
         schema = DebugSchema()
         try:
@@ -88,9 +83,9 @@ def create_app():
         else:
             return schema.dump(data)
 
-    @app.route('/testing/', methods=['post'])
+    @app.route('/testing', methods=['post'])
     def testing():
-        schema = TestsSchema()
+        schema = TestingSchema()
         try:
             data = PostgresqlService.testing(
                 schema.load(request.get_json())

@@ -3,7 +3,12 @@ import subprocess
 from typing import Optional
 from app.entities import (
     DebugData,
-    TestsData
+    TestsData,
+    TestingData,
+    DeleteData,
+    CreateData,
+    StatusData,
+    StatusAllData
 )
 import psycopg2
 import shlex
@@ -17,155 +22,184 @@ from app.service import messages
 class PostgresqlService:
 
     @classmethod
-    def create(self, name, file_name):
-        try:
+    def status(cls, data: StatusData, name) -> StatusData:
 
-            con = psycopg2.connect(host=config.PSQL_HOST, user=config.PSQL_USER,
-                                   password=config.PSQL_PASSWORD, port=config.PSQL_PORT)
-            cursor = con.cursor()
-            sqlCreateDatabase = "create database " + name + ";"
-            cursor.execute(sqlCreateDatabase)
-
-            cmd_grant_privs = "GRANT ALL PRIVILEGES ON DATABASE " + name + " TO user ;"
-            cursor.execute(cmd_grant_privs)
-            return "db created \n"
-
-
-        except Exception as e:
-            return e
-
-    @classmethod
-    def drop_db(self, db_name):
-        try:
-
-            con = psycopg2.connect(host="postgresmodule-db",
-                                   user="user", password="user", port="5433")
-
-            cursor = con.cursor()
-
-            sqlCreateDatabase = "drop database " + db_name + ";"
-            cursor.execute(sqlCreateDatabase)
-            return "db dropped \n"
-            # con.commit()
-
-
-        except Exception as e:
-            return e
-
-    @classmethod
-    def check_if_db_exists(self, db_name):
-        try:
-
-            con = psycopg2.connect(host="postgresmodule-db",
-                                   user="user", password="user", port="5433")
-
-            cursor = con.cursor()
-
-            # datname is case sensetive so dbname should be turned lower case
-            sqlCreateDatabase = "SELECT datname FROM pg_database where datname = '" + db_name + "';"
-            cursor.execute(sqlCreateDatabase)
-            result = len(cursor.fetchall())
-            if result > 0:
-                return "db exists\n"
-            else:
-                return "db doesn't exist\n"
-
-        except Exception as e:
-            return e
-
-    @classmethod
-    def backup_db(self, db_name):
-        try:
-            pth = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            backup_dir = os.path.join(pth, "backup")
-            filename = f'backup.sql'
-            str_date = datetime.now().strftime('%Y-%m-%d')
-            file_dir = f'{backup_dir}'
-            file_path = f'{file_dir}/{filename}'
-
-            db_user = "user"
-            db_host = "postgresql-db"
-            db_pass = "user"
-            command = f'mkdir -p {file_dir} && ' \
-                      f'export PGPASSWORD={db_pass} && ' \
-                      f'pg_dump -U {db_user} -h {db_host} {db_name} > {file_path}'
-            os.system(command)
-            #self.stdout.write(self.style.SUCCESS(f'file: {file_path}'))
-
-
-
-
-            #(out, err) = proc.communicate()
-
-            return  "db backed up"
-            #return "dump loaded \n"
-
-        except Exception as e:
-            return e
-
-    @classmethod
-    def load_backup(self, db_name):
-        try:
-            cmnd = """pg_dump """ + db_name + """ < dumpfile.sql"""
-            # os.system(cmnd)
-            # proc = subprocess.Popen(shlex.split(cmnd), stdout=subprocess.PIPE)
-
-            proc = subprocess.Popen(shlex.split(cmnd), shell=True, env={
-                "PGPASSWORD": "user",
-                "PGUSER": "user",
-                "PGPORT": "5433",
-                "PGHOST": "postgresql-db"
-            })
-
-            (out, err) = proc.communicate()
-            return str(out)
-        except Exception as e:
-            return e
-
-    @classmethod
-    def select_from_db(self, db_name, command):
-        con = psycopg2.connect(host="postgresmodule-db", database=db_name,
-                               user="user", password="user", port="5433")
-
+        con = psycopg2.connect(host=config.PSQL_HOST, user=config.PSQL_USER,
+                               password=config.PSQL_PASSWORD, port=config.PSQL_PORT)
         cursor = con.cursor()
+        sqlCreateDatabase = "SELECT datname FROM pg_database where datname = '" + name + "';"
+        cursor.execute(sqlCreateDatabase)
+        result = len(cursor.fetchall())
+        if result > 0:
+            data.name = name
+            data.status = 'active'
+        else:
+            data.name = name
+            data.status = 'not exists'
 
-        cursor.execute(command)
-        return cursor.fetchall()
-
-    @classmethod
-    def change_db(db_name, command):
-        with psycopg2.connect(host="postgresmodule-db", database=db_name,
-                              user="user", password="user", port="5433") as con:
-            with con.cursor() as cursor:
-                cursor.execute(command)
-
-                con.rollback()
-
-        return "db changed and returned to normal \n"
-
-
-    @classmethod
-    def debug(cls, data: DebugData) -> DebugData:
-        exec_result = cls._execute(
-            code=data.code,
-            data_in=data.data_in
-        )
-        data.result = exec_result.result
-        data.error = exec_result.error
         return data
 
     @classmethod
-    def testing(cls, data: TestsData) -> TestsData:
+    def status_all(cls, data: StatusAllData) -> StatusAllData:
+        con = psycopg2.connect(host=config.PSQL_HOST, user=config.PSQL_USER,
+                               password=config.PSQL_PASSWORD, port=config.PSQL_PORT)
+        cursor = con.cursor()
+        sqlCreateDatabase = "SELECT datname FROM pg_database ;"
+        cursor.execute(sqlCreateDatabase)
+        result = cursor.fetchall()
+
+        for name in result:
+            a: StatusData
+            cls.status(a, str(name[0]))
+            data.status.insert(a)
+
+        return data
+
+    @classmethod
+    def create(cls, data: CreateData) -> CreateData:
+
+        con = psycopg2.connect(host=config.PSQL_HOST, user=config.PSQL_USER,
+                               password=config.PSQL_PASSWORD, port=config.PSQL_PORT)
+        cursor = con.cursor()
+        sqlCreateDatabase = "create database " + data.name + ";"
+        cursor.execute(sqlCreateDatabase)
+
+        cmd_grant_privs = "GRANT ALL PRIVILEGES ON DATABASE " + data.name + " TO " + config.PSQL_USER + " ;"
+        cursor.execute(cmd_grant_privs)
+
+        pth = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        backup_dir = os.path.join(pth, "backup")
+        filename = data.filename
+        file_dir = f'{backup_dir}'
+        file_path = f'{file_dir}/{filename}'
+
+        cmd = f'mkdir -p {file_dir}'
+        os.system(cmd)
+
+        command = f'pg_dump {data.name} < {file_path}'
+        proc = subprocess.Popen(shlex.split(command), shell=True, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, env={
+            "PGPASSWORD": config.PSQL_PASSWORD,
+            "PGUSER": config.PSQL_USER,
+            "PGPORT": config.PSQL_PORT,
+            "PGHOST": config.PSQL_HOST
+        })
+
+        (out, err) = proc.communicate()
+        if err is None:
+            data.status = 'active'
+        else:
+            data.status = 'not exists'
+            data.message = err
+            data.details = "some details"
+
+        return data
+
+
+    @classmethod
+    def delete(cls, data: DeleteData) -> DeleteData:
+
+        con = psycopg2.connect(host=config.PSQL_HOST, user=config.PSQL_USER,
+                               password=config.PSQL_PASSWORD, port=config.PSQL_PORT)
+        cursor = con.cursor()
+        sqlCreateDatabase = "drop database " + data.name + ";"
+        cursor.execute(sqlCreateDatabase)
+
+        sqlCheckDatabase = "SELECT datname FROM pg_database where datname = '" + data.name + "';"
+        cursor.execute(sqlCheckDatabase)
+        result = len(cursor.fetchall())
+        if result > 0:
+            data.status = 'active'
+        else:
+            data.status = 'not exists'
+
+        return data
+
+
+    @classmethod
+    def _select_from_db(cls, db_name, student_command, true_command):
+
+        with psycopg2.connect(host=config.PSQL_HOST, user=config.PSQL_USER, database=db_name,
+                         password=config.PSQL_PASSWORD, port=config.PSQL_PORT) as con:
+            with con.cursor() as cursor:
+                cursor.execute(f"""
+                    SELECT CASE WHEN NOT EXISTS (
+                            {student_command}
+                            except
+                            {true_command}
+                        )
+                        THEN TRUE
+                        ELSE FALSE
+                    END
+                """)
+                result = cursor.fetchall()
+                con.rollback()
+
+        return result
+
+    @classmethod
+    def _change_db(cls, db_name, student_command, check_command):
+        with psycopg2.connect(host=config.PSQL_HOST, user=config.PSQL_USER, database=db_name,
+                              password=config.PSQL_PASSWORD, port=config.PSQL_PORT) as con:
+            with con.cursor() as cursor:
+                cursor.execute(student_command)
+                cursor.execute(f"""
+                                SELECT CASE WHEN NOT EXISTS (
+                                        {check_command}
+                                    )
+                                    THEN TRUE
+                                    ELSE FALSE
+                                END
+                            """)
+                result = cursor.fetchall()
+                con.rollback()
+
+        return result
+
+    @classmethod
+    def debug(cls, data: DebugData) -> DebugData:
+        try:
+            if data.request_type == 'select':
+                result = cls._select_from_db(data.name, data.code, data.check_code)
+
+            else:
+                result = cls._change_db(data.name, data.code, data.check_code)
+
+            for row in result:
+                for col in row:
+                    data.result += str(col) + ' '
+                data.result += '\n'
+
+        except Exception as e:
+            data.error = e
+
+        return data
+
+    @classmethod
+    def test(cls, data: TestsData, name, code, check_code, request_type) -> TestsData:
+        try:
+            if request_type == 'select':
+                result = cls._select_from_db(name, code, check_code)
+            else:
+                result = cls._change_db(name, code, check_code)
+
+                for row in result:
+                    for col in row:
+                        if col is True:
+                            data.ok = True
+        except Exception as e:
+            data.error = e
+
+        return data
+
+    @classmethod
+    def testing(cls, data: TestingData) -> TestingData:
         for test in data.tests:
-            exec_result = cls._execute(
-                code=data.code,
-                data_in=test.data_in
-            )
-            test.result = exec_result.result
-            test.error = exec_result.error
-            test.ok = cls._check(
-                checker_func=data.checker,
-                right_value=test.data_out,
-                value=test.result
-            )
+            result = cls.test(test, data.name, data.code, data.check_code, test.request_type)
+
+            if result.ok:
+                data.num_ok += 1
+        if data.num_ok == len(data.tests):
+            data.ok = True
+
         return data

@@ -15,8 +15,12 @@ from marshmallow.decorators import (
 
 from app.entities import (
     DebugData,
-    TestData,
-    TestsData
+    TestsData,
+    TestingData,
+    DeleteData,
+    CreateData,
+    StatusData,
+    StatusAllData
 )
 from app.service.exceptions import ServiceException
 
@@ -39,8 +43,10 @@ class StrField(Field):
 
 class DebugSchema(Schema):
 
-    data_in = StrField(load_only=True)
-    code = StrField(required=True, load_only=True)
+    name = StrField(load_only=True, required=True)
+    code = StrField(load_only=True, required=True)
+    check_code = StrField(load_only=True, required=True)
+    request_type = StrField(load_only=True, required=True)
     result = StrField(dump_only=True)
     error = StrField(dump_only=True)
 
@@ -49,40 +55,78 @@ class DebugSchema(Schema):
         return DebugData(**data)
 
 
-class TestSchema(Schema):
-
-    data_in = StrField(load_only=True)
-    data_out = StrField(required=True, load_only=True)
-    result = StrField(dump_only=True)
-    error = StrField(dump_only=True)
+class TestsSchema(Schema):
+    data_in = StrField(load_only=True, required=True)
+    request_type = StrField(load_only=True, required=True)
     ok = Boolean(dump_only=True)
+    error = StrField(dump_only=True)
 
     @post_load
-    def make_test_data(self, data, **kwargs) -> TestData:
-        return TestData(**data)
+    def make_test_data(self, data, **kwargs) -> TestsData:
+        return TestsData(**data)
 
 
-class TestsSchema(Schema):
+class TestingSchema(Schema):
 
-    tests = Nested(TestSchema, many=True, required=True)
-    checker = StrField(load_only=True, required=True)
-    code = StrField(load_only=True, required=True)
+    tests = Nested(TestsSchema, many=True, required=True)
     num = Integer(dump_only=True)
     num_ok = Integer(dump_only=True)
     ok = Boolean(dump_only=True)
+    code = StrField(load_only=True, required=True)
+    name = StrField(load_only=True, required=True)
+    check_code = StrField(load_only=True, required=True)
 
     @post_load
-    def make_tests_data(self, data, **kwargs) -> TestsData:
-        return TestsData(**data)
+    def make_tests_data(self, data, **kwargs) -> TestingData:
+        return TestingData(**data)
 
     @pre_dump
-    def calculate_properties(self, data: TestsData, **kwargs):
+    def calculate_properties(self, data: TestingData, **kwargs):
         data.num = len(data.tests)
         for test in data.tests:
             if test.ok:
                 data.num_ok += 1
         data.ok = data.num == data.num_ok
         return data
+
+
+class DeleteSchema(Schema):
+    name = StrField(load_only=True, required=True)
+
+    @post_load
+    def make_debug_data(self, data, **kwargs) -> DeleteData:
+        return DeleteData(**data)
+
+
+class CreateSchema(Schema):
+
+    name = StrField(load_only=True, required=True)
+    filename = StrField(load_only=True, required=True)
+    status = StrField(post_only=True)
+    message = StrField(post_only=True)
+    details = StrField(post_only=True)
+
+    @post_load
+    def make_debug_data(self, data, **kwargs) -> CreateData:
+        return CreateData(**data)
+
+
+class StatusSchema(Schema):
+    name = StrField(dump_only=True, required=True)
+    status = StrField(dump_only=True, required=True)
+
+    @post_load
+    def make_debug_data(self, data, **kwargs) -> StatusData:
+        return StatusData(**data)
+
+
+class StatusAllSchema(Schema):
+
+    status = Nested(StatusSchema, many=True, required=True)
+
+    @post_load
+    def make_debug_data(self, data, **kwargs) -> StatusAllData:
+        return StatusAllData(**data)
 
 
 class BadRequestSchema(Schema):
