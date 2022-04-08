@@ -67,6 +67,7 @@ class PostgresqlService:
         cmd_grant_privs = "GRANT ALL PRIVILEGES ON DATABASE " + data.name + " TO " + config.PSQL_USER + " ;"
         cursor.execute(cmd_grant_privs)
 
+        # TODO директория с бекапами указывается в конфиге из переменных окружения
         pth = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
         backup_dir = os.path.join(pth, "backup")
         filename = data.filename
@@ -170,6 +171,8 @@ class PostgresqlService:
                     data.result += str(col) + ' '
                 data.result += '\n'
 
+        # TODO Вот тут нужно поднимать ServiceException
+        # TODO Отлавливать нужно конкретные виды ошибок, а не просто Exception
         except Exception as e:
             data.error = e
 
@@ -182,11 +185,12 @@ class PostgresqlService:
                 result = cls._select_from_db(name, code, check_code)
             else:
                 result = cls._change_db(name, code, check_code)
-
+                # TODO Этот цикл не выполнится если будет первое условие цикла
                 for row in result:
                     for col in row:
                         if col is True:
                             data.ok = True
+        # TODO Отлавливать нужно конкретные виды ошибок, а не просто Exception
         except Exception as e:
             data.error = e
 
@@ -195,6 +199,8 @@ class PostgresqlService:
     @classmethod
     def testing(cls, data: TestingData) -> TestingData:
         for test in data.tests:
+            # TODO вот именно тот случай когда.
+            #  Очень уместо использовать именованные аргументы
             result = cls.test(test, data.name, data.code, data.check_code, test.request_type)
 
             if result.ok:

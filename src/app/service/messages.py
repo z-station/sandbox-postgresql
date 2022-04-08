@@ -1,3 +1,4 @@
+# TODO Не нужно добавлять код который не используется, или удалить или использовать
 MSG_1 = 'Program execution time limit exceeded. Limit 5 seconds!'
 MSG_2 = (
     'Checker func should starts with:\n'
