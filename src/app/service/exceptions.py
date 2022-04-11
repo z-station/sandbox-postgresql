@@ -15,13 +15,5 @@ class ServiceException(Exception):
         super().__init__(self.message)
 
 
-class TimeoutException(ServiceException):
-    default_message = messages.MSG_1
-
-
-class CheckerException(ServiceException):
-    default_message = messages.MSG_5
-
-
 class ExecutionException(ServiceException):
     default_message = messages.MSG_6

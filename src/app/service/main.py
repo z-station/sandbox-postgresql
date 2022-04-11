@@ -82,9 +82,9 @@ class PostgresqlService:
             host = config.PSQL_HOST
             name = data.name
             cmnd = f'export PGPASSWORD={pwd} && ' \
-                    f'dropdb -f --if-exists -U {usr} -h {host} -p {prt} {name} && ' \
-                    f'createdb -U {usr} -h {host} -p {prt} {name} && ' \
-                    f'psql -U {usr} -h {host} -p {prt} {name} < {file_path} '
+                   f'dropdb -f --if-exists -U {usr} -h {host} -p {prt} {name} && ' \
+                   f'createdb -U {usr} -h {host} -p {prt} {name} && ' \
+                   f'psql -U {usr} -h {host} -p {prt} {name} < {file_path} '
             os.system(cmnd)
             data.status = 'active'
 
@@ -200,6 +200,8 @@ class PostgresqlService:
                 for col in row:
                     data.result.append(col)
 
+        # TODO Вот тут нужно поднимать ServiceException
+        # TODO Отлавливать нужно конкретные виды ошибок, а не просто Exception
         except Exception as e:
             raise exceptions.ExecutionException(details=str(e))
 
@@ -221,12 +223,12 @@ class PostgresqlService:
             else:
                 result = cls._change_db(name, code, check_code)
 
+            # TODO Этот цикл не выполнится если будет первое условие цикла
             for row in result:
                 for col in row:
-                    if col:
+                    if col is True:
                         data.ok = True
-                    else:
-                        data.ok = False
+            # TODO Отлавливать нужно конкретные виды ошибок, а не просто Exception
 
         except Exception as e:
             raise exceptions.ExecutionException(details=str(e))
