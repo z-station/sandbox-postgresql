@@ -19,7 +19,6 @@ from app.service.exceptions import ServiceException
 
 
 def create_app():
-
     app = Flask(__name__)
 
     @app.errorhandler(400)
@@ -29,16 +28,13 @@ def create_app():
     @app.route('/status', methods=['get'])
     def status():
         schema = StatusAllSchema()
-        data = PostgresqlService.status_all(
-            schema.load(request.get_json())
-        )
+        data = PostgresqlService.status_all()
         return schema.dump(data)
 
     @app.route('/status/<name>', methods=['get'])
-    def status(name):
+    def status_name(name):
         schema = StatusSchema()
         data = PostgresqlService.status(
-            schema.load(request.get_json()),
             name
         )
         return schema.dump(data)
@@ -94,6 +90,7 @@ def create_app():
             abort(400, ex)
         else:
             return schema.dump(data)
+
     return app
 
 

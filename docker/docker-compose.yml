@@ -44,9 +44,9 @@ services:
 
     environment:
       POSTGRES_HOST_AUTH_METHOD: trust
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: user
-      POSTGRES_DB: user
+      POSTGRES_USER: ps_user
+      POSTGRES_PASSWORD: ps_user
+      POSTGRES_DB: ps_user
     restart: always
 
 

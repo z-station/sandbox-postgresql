@@ -5,7 +5,8 @@ from marshmallow.fields import (
     Field,
     Boolean,
     Integer,
-    Method
+    Method,
+    List
 )
 from marshmallow.decorators import (
     post_load,
@@ -47,7 +48,7 @@ class DebugSchema(Schema):
     code = StrField(load_only=True, required=True)
     check_code = StrField(load_only=True, required=True)
     request_type = StrField(load_only=True, required=True)
-    result = StrField(dump_only=True)
+    result = List(Boolean, dump_only=True)
     error = StrField(dump_only=True)
 
     @post_load
@@ -83,9 +84,11 @@ class TestingSchema(Schema):
     @pre_dump
     def calculate_properties(self, data: TestingData, **kwargs):
         data.num = len(data.tests)
+
         for test in data.tests:
             if test.ok:
                 data.num_ok += 1
+
         data.ok = data.num == data.num_ok
         return data
 
@@ -94,7 +97,7 @@ class DeleteSchema(Schema):
     name = StrField(load_only=True, required=True)
 
     @post_load
-    def make_debug_data(self, data, **kwargs) -> DeleteData:
+    def make_delete_data(self, data, **kwargs) -> DeleteData:
         return DeleteData(**data)
 
 
@@ -107,7 +110,7 @@ class CreateSchema(Schema):
     details = StrField(post_only=True)
 
     @post_load
-    def make_debug_data(self, data, **kwargs) -> CreateData:
+    def make_create_data(self, data, **kwargs) -> CreateData:
         return CreateData(**data)
 
 
@@ -116,16 +119,16 @@ class StatusSchema(Schema):
     status = StrField(dump_only=True, required=True)
 
     @post_load
-    def make_debug_data(self, data, **kwargs) -> StatusData:
+    def make_status_data(self, data, **kwargs) -> StatusData:
         return StatusData(**data)
 
 
 class StatusAllSchema(Schema):
-
-    status = Nested(StatusSchema, many=True, required=True)
+    name = List(StrField, dump_only=True, required=True)
+    status = List(StrField, dump_only=True, required=True)
 
     @post_load
-    def make_debug_data(self, data, **kwargs) -> StatusAllData:
+    def make_status_all_data(self, data, **kwargs) -> StatusAllData:
         return StatusAllData(**data)
 
 
