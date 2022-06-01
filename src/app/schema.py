@@ -1,19 +1,17 @@
 from typing import Optional
-from marshmallow import Schema, ValidationError
+from marshmallow import Schema
 from marshmallow.fields import (
     Nested,
     Field,
     Boolean,
-    Integer,
     Method,
-    List
+    List,
+    Raw,
 )
 from marshmallow.decorators import (
     post_load,
     pre_dump
 )
-
-
 from app.entities import (
     DebugData,
     TestsData,
@@ -23,32 +21,23 @@ from app.entities import (
     StatusData,
     StatusAllData
 )
-from app.service.exceptions import ServiceException
+from app.utils import clean_str
 
 
 class StrField(Field):
 
-    def _clean_str(self, value: str) -> str:
-        return value.replace('\r', '').rstrip('\n')
-
     def _deserialize(self, value: Optional[str], *args, **kwargs):
-        if isinstance(value, str):
-            return self._clean_str(value)
-        return value
+        return clean_str(value)
 
     def _serialize(self, value: Optional[str], *args, **kwargs):
-        if isinstance(value, str):
-            return self._clean_str(value)
-        return value
+        return clean_str(value)
 
 
 class DebugSchema(Schema):
 
     name = StrField(load_only=True, required=True)
     code = StrField(load_only=True, required=True)
-    check_code = StrField(load_only=True, required=True)
-    request_type = StrField(load_only=True, required=True)
-    result = List(Boolean, dump_only=True)
+    result = Raw(dump_only=True)
     error = StrField(dump_only=True)
 
     @post_load
@@ -58,7 +47,6 @@ class DebugSchema(Schema):
 
 class TestsSchema(Schema):
     data_in = StrField(load_only=True, required=True)
-    request_type = StrField(load_only=True, required=True)
     ok = Boolean(dump_only=True)
     error = StrField(dump_only=True)
 
@@ -70,12 +58,9 @@ class TestsSchema(Schema):
 class TestingSchema(Schema):
 
     tests = Nested(TestsSchema, many=True, required=True)
-    num = Integer(dump_only=True)
-    num_ok = Integer(dump_only=True)
-    ok = Boolean(dump_only=True)
     code = StrField(load_only=True, required=True)
     name = StrField(load_only=True, required=True)
-    check_code = StrField(load_only=True, required=True)
+    request_type = StrField(load_only=True, required=True)
 
     @post_load
     def make_tests_data(self, data, **kwargs) -> TestingData:
@@ -105,9 +90,7 @@ class CreateSchema(Schema):
 
     name = StrField(load_only=True, required=True)
     filename = StrField(load_only=True, required=True)
-    status = StrField(post_only=True)
-    message = StrField(post_only=True)
-    details = StrField(post_only=True)
+    status = StrField(dump_only=True)
 
     @post_load
     def make_create_data(self, data, **kwargs) -> CreateData:
@@ -138,19 +121,19 @@ class BadRequestSchema(Schema):
     details = Method('dump_details')
 
     def dump_error(self, obj):
-        ex = obj.description
-        if isinstance(ex, ServiceException):
-            return ex.message
-        elif isinstance(ex, ValidationError):
-            return 'Validation error'
-        else:
-            return 'Internal error'
+        return 'Validation error'
 
     def dump_details(self, obj):
-        ex = obj.description
-        if isinstance(ex, ServiceException):
-            return ex.details
-        elif isinstance(ex, ValidationError):
-            return ex.messages
-        else:
-            return str(ex)
+        return obj.description.messages
+
+
+class ServiceExceptionSchema(Schema):
+
+    error = Method('dump_error')
+    details = Method('dump_details')
+
+    def dump_error(self, obj):
+        return obj.description.message
+
+    def dump_details(self, obj):
+        return obj.description.details

@@ -13,7 +13,8 @@ from app.schema import (
     CreateSchema,
     StatusSchema,
     StatusAllSchema,
-    BadRequestSchema
+    BadRequestSchema,
+    ServiceExceptionSchema
 )
 from app.service.exceptions import ServiceException
 
@@ -22,22 +23,42 @@ def create_app():
     app = Flask(__name__)
 
     @app.errorhandler(400)
-    def bad_request_handler(ex: Exception):
+    def bad_request_handler(ex: ValidationError):
         return BadRequestSchema().dump(ex), 400
+
+    @app.errorhandler(500)
+    def bad_request_handler(ex: ServiceException):
+        if isinstance(ex, ServiceException):
+            return ServiceExceptionSchema().dump(ex), 500
+        return ex, 500
+
+    @app.route('/', methods=['get'])
+    def index():
+        return render_template("index.html")
 
     @app.route('/status', methods=['get'])
     def status():
         schema = StatusAllSchema()
-        data = PostgresqlService.status_all()
-        return schema.dump(data)
+        try:
+            data = PostgresqlService.status_all()
+        except ValidationError as ex:
+            abort(400, ex)
+        except ServiceException as ex:
+            abort(500, ex)
+        else:
+            return schema.dump(data)
 
     @app.route('/status/<name>', methods=['get'])
     def status_name(name):
         schema = StatusSchema()
-        data = PostgresqlService.status(
-            name
-        )
-        return schema.dump(data)
+        try:
+            data = PostgresqlService.status(name)
+        except ValidationError as ex:
+            abort(400, ex)
+        except ServiceException as ex:
+            abort(500, ex)
+        else:
+            return schema.dump(data)
 
     @app.route('/create', methods=['post'])
     def create():
@@ -46,8 +67,10 @@ def create_app():
             data = PostgresqlService.create(
                 schema.load(request.get_json())
             )
-        except (ServiceException, ValidationError) as ex:
+        except ValidationError as ex:
             abort(400, ex)
+        except ServiceException as ex:
+            abort(500, ex)
         else:
             return schema.dump(data)
 
@@ -55,17 +78,15 @@ def create_app():
     def delete(name):
         schema = DeleteSchema()
         try:
-            data = PostgresqlService.delete(
-                schema.load(request.get_json())
+            PostgresqlService.delete(
+                schema.load(name)
             )
-        except (ServiceException, ValidationError) as ex:
+        except ValidationError as ex:
             abort(400, ex)
+        except ServiceException as ex:
+            abort(500, ex)
         else:
-            return schema.dump(data)
-
-    @app.route('/', methods=['get'])
-    def index():
-        return render_template("index.html")
+            return {}
 
     @app.route('/debug', methods=['post'])
     def debug():
@@ -74,8 +95,10 @@ def create_app():
             data = PostgresqlService.debug(
                 schema.load(request.get_json())
             )
-        except (ServiceException, ValidationError) as ex:
+        except ValidationError as ex:
             abort(400, ex)
+        except ServiceException as ex:
+            abort(500, ex)
         else:
             return schema.dump(data)
 
@@ -86,8 +109,10 @@ def create_app():
             data = PostgresqlService.testing(
                 schema.load(request.get_json())
             )
-        except (ServiceException, ValidationError) as ex:
+        except ValidationError as ex:
             abort(400, ex)
+        except ServiceException as ex:
+            abort(500, ex)
         else:
             return schema.dump(data)
 

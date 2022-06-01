@@ -16,39 +16,40 @@ services:
       - ../src:/app/src
       - docker_shared_files:/files:ro
     ports:
-      - "9003:9003"
+      - "9004:9004"
     networks:
       - docker_localhost
     environment:
+      - DEBUG=true
       - SANDBOX_USER_UID=999
       - SANDBOX_DIR=/sandbox
+      - PSQL_USER=sandbox
+      - PSQL_PASSWORD=sandbox
+      - PSQL_PORT=5433
+      - PSQL_HOST=sandbox-postgresql-db
     restart: on-failure
-    command: gunicorn --pythonpath '/app/src' --bind 0:9003 app.main:app --reload -w 1
+    command: gunicorn --pythonpath '/app/src' --bind 0:9004 app.main:app --reload -w 1
     depends_on:
-      - postgresql-db
+      - sandbox-postgresql-db
 
-
-  postgresql-db:
-    container_name: postgresmodule-db
+  sandbox-postgresql-db:
+    container_name: sandbox-postgresql-db
     image: postgres:13
     networks:
       - docker_localhost
-    #volumes:
-    #  - ../postgresql-data:/var/lib/postgresql/data
-
+    volumes:
+      - ../postgresql-data:/var/lib/postgresql/data
     ports:
-      - 5433:5433
+      - "5433:5433"
     expose:
-      - 5433
+      - "5433"
     command: -p 5433
-
     environment:
       POSTGRES_HOST_AUTH_METHOD: trust
-      POSTGRES_USER: ps_user
-      POSTGRES_PASSWORD: ps_user
-      POSTGRES_DB: ps_user
+      POSTGRES_USER: sandbox
+      POSTGRES_PASSWORD: sandbox
+      POSTGRES_DB: sandbox
     restart: always
-
 
 
 networks:
@@ -58,3 +59,6 @@ networks:
 volumes:
   docker_shared_files:
     external: true
+  # монтирование к ФС невозможно т.к. требуется абсолютный путь
+  # для получения доступа к файлам использовать путь
+  # указанный в Mountpoint команды "docker inspect docker_shared_files"
