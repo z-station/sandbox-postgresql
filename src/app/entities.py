@@ -58,5 +58,4 @@ class StatusData:
 
 @dataclass
 class StatusAllData:
-    status: List[str] = None
-    name: List[str] = None
+    statuses: List[StatusData]

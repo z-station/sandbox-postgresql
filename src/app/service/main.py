@@ -1,5 +1,6 @@
 import os
 import sys
+import copy
 from tabulate import tabulate
 import logging
 from logging import StreamHandler, Formatter
@@ -67,9 +68,7 @@ class PostgresqlService:
         """
         returns a list of all databases on the server and their status 'active'/'not exists'
         """
-        data = StatusAllData()
-        data.status = []
-        data.name = []
+        data = StatusAllData([])
         try:
             with psycopg2.connect(
                 host=config.PSQL_HOST,
@@ -86,12 +85,16 @@ class PostgresqlService:
                 message=messages.MSG_3,
                 details=str(e)
             )
-        else:
-            for name in result:
-                stat = cls.status(str(name[0]))
-                if "sandbox_database" in str(name[0]):
-                    data.status.append(stat.status)
-                    data.name.append(stat.name)
+        obj = StatusData()
+        indxs = 0
+        for name in result:
+            stat = cls.status(str(name[0]))
+            if "sandbox_database" in str(name[0]):
+                obj.status = stat.status
+                obj.name = stat.name
+                logger.info(str(stat.name))
+                data.statuses.append(copy.deepcopy(obj))
+                indxs += 1
         return data
 
     @classmethod

@@ -5,7 +5,6 @@ from marshmallow.fields import (
     Field,
     Boolean,
     Method,
-    List,
     Raw,
 )
 from marshmallow.decorators import (
@@ -113,8 +112,7 @@ class StatusSchema(Schema):
 
 
 class StatusAllSchema(Schema):
-    name = List(StrField, dump_only=True, required=True)
-    status = List(StrField, dump_only=True, required=True)
+    statuses = Nested(StatusSchema, many=True, required=True)
 
     @post_load
     def make_status_all_data(self, data, **kwargs) -> StatusAllData:
