@@ -5,7 +5,7 @@ from app.service.enums import SQLCommandType
 
 @dataclass
 class DebugData:
-    result: List[bool] = None
+    result: str = None
     error: Optional[str] = None
     name: Optional[str] = None
     code: Optional[str] = None
@@ -15,6 +15,7 @@ class DebugData:
 class TestsData:
     __test__ = False
 
+    result: Optional[str] = None
     data_in: Optional[str] = None
     error: Optional[str] = None
     ok: Optional[bool] = None
@@ -36,6 +37,8 @@ class TestingData:
 @dataclass
 class DeleteData:
     name: Optional[str] = None
+    message: Optional[str] = None
+    details: Optional[str] = None
 
 
 @dataclass
@@ -43,6 +46,8 @@ class CreateData:
     name: Optional[str] = None
     filename: Optional[str] = None
     status: Optional[str] = None
+    message: Optional[str] = None
+    details: Optional[str] = None
 
 
 @dataclass

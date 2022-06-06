@@ -15,5 +15,17 @@ class ServiceException(Exception):
         super().__init__(self.message)
 
 
-class ExecutionException(ServiceException):
-    default_message = messages.MSG_6
+class CreationException(ServiceException):
+    default_message = messages.MSG_1
+
+
+class DeletionException(ServiceException):
+    default_message = messages.MSG_2
+
+
+class StatusCheckException(ServiceException):
+    default_message = messages.MSG_3
+
+
+class CommandException(ServiceException):
+    default_message = messages.MSG_4

@@ -11,6 +11,7 @@ flask = "*"
 requests = "*"
 psycopg2 = "*"
 marshmallow = "*"
+tabulate = "*"
 
 [requires]
 python_version = "3.8"

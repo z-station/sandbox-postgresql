@@ -49,6 +49,7 @@ class TestsSchema(Schema):
     data_in = StrField(load_only=True, required=True)
     ok = Boolean(dump_only=True)
     error = StrField(dump_only=True)
+    result = Raw(dump_only=True)
 
     @post_load
     def make_test_data(self, data, **kwargs) -> TestsData:
@@ -61,6 +62,7 @@ class TestingSchema(Schema):
     code = StrField(load_only=True, required=True)
     name = StrField(load_only=True, required=True)
     request_type = StrField(load_only=True, required=True)
+    ok = Boolean(dump_only=True)
 
     @post_load
     def make_tests_data(self, data, **kwargs) -> TestingData:
@@ -80,6 +82,8 @@ class TestingSchema(Schema):
 
 class DeleteSchema(Schema):
     name = StrField(load_only=True, required=True)
+    message = StrField(dump_only=True)
+    details = StrField(dump_only=True)
 
     @post_load
     def make_delete_data(self, data, **kwargs) -> DeleteData:
@@ -91,6 +95,8 @@ class CreateSchema(Schema):
     name = StrField(load_only=True, required=True)
     filename = StrField(load_only=True, required=True)
     status = StrField(dump_only=True)
+    message = StrField(dump_only=True)
+    details = StrField(dump_only=True)
 
     @post_load
     def make_create_data(self, data, **kwargs) -> CreateData:

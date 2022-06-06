@@ -12,9 +12,9 @@ services:
     container_name: sandbox-postgresql
     image: sandbox-postgresql
     volumes:
-      - ../backup:/app/backup
-      - ../src:/app/src
-      - docker_shared_files:/files:ro
+      - ../backup:/sandbox/backup
+      - ../src:/sandbox/src
+      - shared_files:/sandbox/files:ro
     ports:
       - "9004:9004"
     networks:
@@ -28,7 +28,7 @@ services:
       - PSQL_PORT=5433
       - PSQL_HOST=sandbox-postgresql-db
     restart: on-failure
-    command: gunicorn --pythonpath '/app/src' --bind 0:9004 app.main:app --reload -w 1
+    command: gunicorn --pythonpath '/sandbox/src' --bind 0:9004 app.main:app --reload -w 1
     depends_on:
       - sandbox-postgresql-db
 
@@ -57,7 +57,7 @@ networks:
     external: true
 
 volumes:
-  docker_shared_files:
+  shared_files:
     external: true
   # монтирование к ФС невозможно т.к. требуется абсолютный путь
   # для получения доступа к файлам использовать путь

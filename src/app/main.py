@@ -78,17 +78,17 @@ def create_app():
     def delete(name):
         schema = DeleteSchema()
         try:
-            PostgresqlService.delete(
-                schema.load(name)
+            data = PostgresqlService.delete(
+                schema.load(request.get_json())
             )
         except ValidationError as ex:
             abort(400, ex)
         except ServiceException as ex:
             abort(500, ex)
         else:
-            return {}
+            return schema.dump(data)
 
-    @app.route('/debug', methods=['post'])
+    @app.route('/debug/', methods=['post'])
     def debug():
         schema = DebugSchema()
         try:
@@ -102,7 +102,7 @@ def create_app():
         else:
             return schema.dump(data)
 
-    @app.route('/testing', methods=['post'])
+    @app.route('/testing/', methods=['post'])
     def testing():
         schema = TestingSchema()
         try:
