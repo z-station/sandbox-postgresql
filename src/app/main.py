@@ -9,10 +9,8 @@ from app.service.main import PostgresqlService
 from app.schema import (
     DebugSchema,
     TestingSchema,
-    DeleteSchema,
     CreateSchema,
     StatusSchema,
-    StatusAllSchema,
     BadRequestSchema,
     ServiceExceptionSchema
 )
@@ -28,9 +26,7 @@ def create_app():
 
     @app.errorhandler(500)
     def bad_request_handler(ex: ServiceException):
-        if isinstance(ex, ServiceException):
-            return ServiceExceptionSchema().dump(ex), 500
-        return ex, 500
+        return ServiceExceptionSchema().dump(ex), 500
 
     @app.route('/', methods=['get'])
     def index():
@@ -38,7 +34,6 @@ def create_app():
 
     @app.route('/status', methods=['get'])
     def status():
-        schema = StatusAllSchema()
         try:
             data = PostgresqlService.status_all()
         except ValidationError as ex:
@@ -46,11 +41,10 @@ def create_app():
         except ServiceException as ex:
             abort(500, ex)
         else:
-            return schema.dump(data)
+            return StatusSchema().dumps(data, many=True)
 
     @app.route('/status/<name>', methods=['get'])
     def status_name(name):
-        schema = StatusSchema()
         try:
             data = PostgresqlService.status(name)
         except ValidationError as ex:
@@ -58,35 +52,34 @@ def create_app():
         except ServiceException as ex:
             abort(500, ex)
         else:
-            return schema.dump(data)
+            return StatusSchema().dump(data)
 
     @app.route('/create', methods=['post'])
     def create():
         schema = CreateSchema()
+        data = schema.load(request.get_json())
         try:
-            data = PostgresqlService.create(
-                schema.load(request.get_json())
+            PostgresqlService.create(
+                name=data.name,
+                filename=data.filename
             )
         except ValidationError as ex:
             abort(400, ex)
         except ServiceException as ex:
             abort(500, ex)
         else:
-            return schema.dump(data)
+            return ''
 
     @app.route('/delete/<name>', methods=['post'])
     def delete(name):
-        schema = DeleteSchema()
         try:
-            data = PostgresqlService.delete(
-                schema.load(request.get_json())
-            )
+            PostgresqlService.delete(name)
         except ValidationError as ex:
             abort(400, ex)
         except ServiceException as ex:
             abort(500, ex)
         else:
-            return schema.dump(data)
+            return ''
 
     @app.route('/debug/', methods=['post'])
     def debug():

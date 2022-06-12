@@ -1,4 +1,4 @@
 #!/bin/bash
-docker volume create shared_files || true
+docker volume create sql_files || true
 docker network create docker_localhost || true
 docker-compose -f ../docker/docker-compose.yml start

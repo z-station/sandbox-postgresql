@@ -5,30 +5,24 @@ services:
   sandbox-postgresql:
     build:
       context: ..
-      args:
-        - SANDBOX_USER_UID=999
-        - SANDBOX_DIR=/sandbox
       dockerfile: ./docker/Dockerfile
     container_name: sandbox-postgresql
     image: sandbox-postgresql
     volumes:
-      - ../backup:/sandbox/backup
-      - ../src:/sandbox/src
-      - shared_files:/sandbox/files:ro
+      - sql_files:/files:ro
+      - ../src:/app/src
     ports:
       - "9004:9004"
     networks:
       - docker_localhost
     environment:
       - DEBUG=true
-      - SANDBOX_USER_UID=999
-      - SANDBOX_DIR=/sandbox
       - PSQL_USER=sandbox
       - PSQL_PASSWORD=sandbox
       - PSQL_PORT=5433
       - PSQL_HOST=sandbox-postgresql-db
     restart: on-failure
-    command: gunicorn --pythonpath '/sandbox/src' --bind 0:9004 app.main:app --reload -w 1
+    command: gunicorn --pythonpath '/app/src' --bind 0:9004 app.main:app --reload -w 1
     depends_on:
       - sandbox-postgresql-db
 
@@ -38,6 +32,7 @@ services:
     networks:
       - docker_localhost
     volumes:
+      - sql_files:/files:ro
       - ../postgresql-data:/var/lib/postgresql/data
     ports:
       - "5433:5433"
@@ -57,8 +52,8 @@ networks:
     external: true
 
 volumes:
-  shared_files:
+  sql_files:
     external: true
   # монтирование к ФС невозможно т.к. требуется абсолютный путь
   # для получения доступа к файлам использовать путь
-  # указанный в Mountpoint команды "docker inspect docker_shared_files"
+  # указанный в Mountpoint команды "docker inspect docker_sql_files"

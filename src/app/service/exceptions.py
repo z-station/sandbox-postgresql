@@ -29,3 +29,19 @@ class StatusCheckException(ServiceException):
 
 class CommandException(ServiceException):
     default_message = messages.MSG_4
+
+
+class FileNotFound(ServiceException):
+    default_message = messages.MSG_5
+
+
+class ExcecutionException(ServiceException):
+    default_message = messages.MSG_6
+
+
+class InvalidCheckCommand(ServiceException):
+    default_message = messages.MSG_7
+
+
+class CheckException(ServiceException):
+    default_message = messages.MSG_8

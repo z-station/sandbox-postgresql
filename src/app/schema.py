@@ -1,5 +1,5 @@
 from typing import Optional
-from marshmallow import Schema
+from marshmallow import Schema, validate
 from marshmallow.fields import (
     Nested,
     Field,
@@ -13,14 +13,16 @@ from marshmallow.decorators import (
 )
 from app.entities import (
     DebugData,
-    TestsData,
+    TestData,
     TestingData,
-    DeleteData,
     CreateData,
     StatusData,
-    StatusAllData
 )
 from app.utils import clean_str
+from app.service.enums import (
+    DebugFormat,
+    SQLCommandType
+)
 
 
 class StrField(Field):
@@ -36,6 +38,11 @@ class DebugSchema(Schema):
 
     name = StrField(load_only=True, required=True)
     code = StrField(load_only=True, required=True)
+    format = StrField(
+        load_only=True,
+        required=True,
+        validate=validate.OneOf(DebugFormat.VALUES)
+    )
     result = Raw(dump_only=True)
     error = StrField(dump_only=True)
 
@@ -51,8 +58,8 @@ class TestsSchema(Schema):
     result = Raw(dump_only=True)
 
     @post_load
-    def make_test_data(self, data, **kwargs) -> TestsData:
-        return TestsData(**data)
+    def make_test_data(self, data, **kwargs) -> TestData:
+        return TestData(**data)
 
 
 class TestingSchema(Schema):
@@ -60,7 +67,11 @@ class TestingSchema(Schema):
     tests = Nested(TestsSchema, many=True, required=True)
     code = StrField(load_only=True, required=True)
     name = StrField(load_only=True, required=True)
-    request_type = StrField(load_only=True, required=True)
+    request_type = StrField(
+        load_only=True,
+        required=True,
+        validate=validate.OneOf(SQLCommandType.VALUES)
+    )
     ok = Boolean(dump_only=True)
 
     @post_load
@@ -79,23 +90,10 @@ class TestingSchema(Schema):
         return data
 
 
-class DeleteSchema(Schema):
-    name = StrField(load_only=True, required=True)
-    message = StrField(dump_only=True)
-    details = StrField(dump_only=True)
-
-    @post_load
-    def make_delete_data(self, data, **kwargs) -> DeleteData:
-        return DeleteData(**data)
-
-
 class CreateSchema(Schema):
 
     name = StrField(load_only=True, required=True)
     filename = StrField(load_only=True, required=True)
-    status = StrField(dump_only=True)
-    message = StrField(dump_only=True)
-    details = StrField(dump_only=True)
 
     @post_load
     def make_create_data(self, data, **kwargs) -> CreateData:
@@ -109,14 +107,6 @@ class StatusSchema(Schema):
     @post_load
     def make_status_data(self, data, **kwargs) -> StatusData:
         return StatusData(**data)
-
-
-class StatusAllSchema(Schema):
-    statuses = Nested(StatusSchema, many=True, required=True)
-
-    @post_load
-    def make_status_all_data(self, data, **kwargs) -> StatusAllData:
-        return StatusAllData(**data)
 
 
 class BadRequestSchema(Schema):
@@ -137,7 +127,13 @@ class ServiceExceptionSchema(Schema):
     details = Method('dump_details')
 
     def dump_error(self, obj):
-        return obj.description.message
+        if hasattr(obj.description, 'message'):
+            return obj.description.message
+        else:
+            return str(obj.description)
 
     def dump_details(self, obj):
-        return obj.description.details
+        if hasattr(obj.description, 'details'):
+            return obj.description.details
+        else:
+            return None

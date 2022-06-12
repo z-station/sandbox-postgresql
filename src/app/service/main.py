@@ -1,222 +1,171 @@
 import os
-import sys
-import copy
+import psycopg2
+from typing import Optional, Tuple
 from tabulate import tabulate
-import logging
-from logging import StreamHandler, Formatter
+from psycopg2.extensions import (
+    AsIs,
+    ISOLATION_LEVEL_AUTOCOMMIT,
+)
 from typing import List
 from app.entities import (
     DebugData,
-    TestsData,
+    TestData,
     TestingData,
-    DeleteData,
-    CreateData,
     StatusData,
-    StatusAllData
 )
-
-import psycopg2
 from app import config
 from app.service import exceptions
-from app.service import messages
-from app.service.enums import SQLCommandType
-
-logger = logging.getLogger('logger')
-logger.setLevel(logging.DEBUG if config.DEBUG else logging.ERROR)
-handler = StreamHandler(stream=sys.stdout)
-logger.addHandler(handler)
-handler.setFormatter(
-    Formatter(fmt='[%(asctime)s: %(levelname)s] %(message)s')
+from app.service.enums import (
+    SQLCommandType,
+    DbStatus,
+    DebugFormat,
 )
+from app.logger import get_logger
+logger = get_logger()
 
 
 class PostgresqlService:
 
-    @classmethod
-    def status(cls, name) -> StatusData:
-        """
-        name: str, database name that's being checked
-        data.name = name
-        data.status: str, status of the checked database 'active'/'not_exists'
-        """
-        data = StatusData
-        try:
-            with psycopg2.connect(
-                host=config.PSQL_HOST,
-                user=config.PSQL_USER,
-                password=config.PSQL_PASSWORD,
-                port=config.PSQL_PORT
-            ) as con:
-                with con.cursor() as cursor:
-                    cursor.execute(
-                        "SELECT datname "
-                        "FROM pg_database "
-                        f"WHERE datname = '{name}';"
-                    )
-                    result = len(cursor.fetchall())
-                    data.status = 'active' if result > 0 and "sandbox_database" in name else 'not exists'
-                    data.name = name
-        except Exception as e:
-            raise exceptions.StatusCheckException(
-                message=messages.MSG_3,
-                details=str(e)
-            )
-        return data
+    db_name_prefix = 'sandbox_'
 
     @classmethod
-    def status_all(cls) -> StatusAllData:
-        """
-        returns a list of all databases on the server and their status 'active'/'not exists'
-        """
-        data = StatusAllData([])
-        try:
-            with psycopg2.connect(
-                host=config.PSQL_HOST,
-                user=config.PSQL_USER,
-                password=config.PSQL_PASSWORD,
-                port=config.PSQL_PORT
-            ) as con:
-                with con.cursor() as cursor:
-                    sqlCreateDatabase = "SELECT datname FROM pg_database ;"
-                    cursor.execute(sqlCreateDatabase)
-                    result = cursor.fetchall()
-        except Exception as e:
-            raise exceptions.StatusCheckException(
-                message=messages.MSG_3,
-                details=str(e)
-            )
-        obj = StatusData()
-        indxs = 0
-        for name in result:
-            stat = cls.status(str(name[0]))
-            if "sandbox_database" in str(name[0]):
-                obj.status = stat.status
-                obj.name = stat.name
-                logger.info(str(stat.name))
-                data.statuses.append(copy.deepcopy(obj))
-                indxs += 1
-        return data
+    def _get_db_name(cls, name: str) -> str:
+        return f'{cls.db_name_prefix}{name}'
 
     @classmethod
-    def create(cls, data: CreateData) -> CreateData:
-        """
-        (re)create db from file
-        data.filename: database dump file from directory /app/backup (db.sql, db.dump)
-        returns state of the database, 'active' - successfully created, 'not exists' - error occurred
-        """
-        fp1 = os.path.join(config.APP_PATH, config.PSQL_BACKUP_DIR)
-        file_path = f'{fp1}/{data.filename}'
-
+    def _delete_database(cls, name: str):
+        con = None
         try:
-            db_exists = os.path.exists(file_path)
-            if not db_exists:
-                raise Exception("no such database file")
-
-            pwd = config.PSQL_PASSWORD
-            usr = config.PSQL_USER
-            prt = config.PSQL_PORT
-            host = config.PSQL_HOST
-            name = data.name
-            cmnd = (
-                f'export PGPASSWORD={pwd} && '
-                f'dropdb -f --if-exists -U {usr} -h {host} -p {prt} {name} && '
-                f'createdb -U {usr} -h {host} -p {prt} {name} && '
-                f'psql -U {usr} -h {host} -p {prt} {name} < {file_path} '
-            )
-            logger.debug(cmnd)
-            os.system(cmnd)
-            data.status = 'active'
-        except Exception as e:
-            data.message = messages.MSG_1,
-            data.details = str(e)
-            data.status = 'doesnt exist'
-
-        return data
-
-    @classmethod
-    def delete(cls, data: DeleteData) -> DeleteData:
-        """
-        drops selected database
-        data.name: str, name of a database that's being dropped
-        returns status of the database 'active' - error occurred,
-        'not exists' - success
-        """
-        try:
-            con = psycopg2.connect(
-                host=config.PSQL_HOST,
-                user=config.PSQL_USER,
-                password=config.PSQL_PASSWORD,
-                port=config.PSQL_PORT
-            )
-            con.set_isolation_level(
-                psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT
-            )
+            con = psycopg2.connect(**config.PSQL_CONFIG)
+            con.initialize(logger)
+            con.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
             cursor = con.cursor()
-            cursor.execute(f"drop database \"" + data.name + "\" ;")
-            con.close()
+            cursor.execute(
+                'DROP DATABASE IF EXISTS %(db_name)s WITH (FORCE)',
+                {'db_name': AsIs(cls._get_db_name(name))}
+            )
         except Exception as e:
-            data.message = messages.MSG_2
-            data.details = str(e)
-
-        return data
+            logger.error(e)
+            raise exceptions.DeletionException(details=str(e))
+        finally:
+            if con:
+                con.close()
 
     @classmethod
-    def _select_from_db(
+    def _create_database(cls, name: str):
+        con = None
+        try:
+            con = psycopg2.connect(**config.PSQL_CONFIG)
+            con.initialize(logger)
+            con.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+            cursor = con.cursor()
+            cursor.execute(
+                'CREATE DATABASE %(db_name)s '
+                'WITH OWNER = %(user)s',
+                {
+                    'db_name': AsIs(cls._get_db_name(name)),
+                    'user': AsIs(config.PSQL_USER)
+                }
+            )
+        except Exception as e:
+            logger.error(e)
+            raise exceptions.CreationException(details=str(e))
+        finally:
+            if con:
+                con.close()
+
+    @classmethod
+    def _load_database_from_file(cls, name: str, filename: str):
+
+        file_path = f'{config.SQL_FILES_DIR}/{filename}'
+        if not os.path.exists(file_path):
+            raise exceptions.FileNotFound()
+        command = (
+            f'export PGPASSWORD={config.PSQL_PASSWORD} && '
+            f'psql -U {config.PSQL_USER} '
+            f'-h {config.PSQL_HOST} '
+            f'-p {config.PSQL_PORT} '
+            f'{cls._get_db_name(name)} < {file_path}'
+        )
+        logger.debug(command)
+        try:
+            os.system(command)
+        except Exception as e:
+            logger.error(e)
+            raise exceptions.CreationException(details=str(e))
+
+    @classmethod
+    def _check_select_command(
         cls,
-        db_name: str,
+        name: str,
         student_command: str,
         true_command: str
-    ) -> List[tuple]:
+    ) -> bool:
+
         """
         execute select query
-        db_name - database for the query
+        name - database for the query
         student_command - query sent by the user
         true_command - command that successfully solves the task
+
+        return True if select rows by student_command identical rows
+        from the true_command.
+
+        Example:
+            student_command: SELECT title FROM tasks_task LIMIT 10
+            true_command: SELECT title FROM tasks_task LIMIT 10 OFFSET 0
         """
 
-        sql = f"""
-        SELECT 
-            CASE 
-            WHEN NOT EXISTS (
-              ({student_command})
-              EXCEPT 
-              ({true_command})
-            ) THEN TRUE
-            ELSE FALSE
-          END;"""
-        with psycopg2.connect(
-            host=config.PSQL_HOST,
-            user=config.PSQL_USER,
-            database=db_name,
-            password=config.PSQL_PASSWORD,
-            port=config.PSQL_PORT
-        ) as con:
-            with con.cursor() as cursor:
-                cursor.execute(sql)
-                result = cursor.fetchall()
-            con.rollback()
-        return result
+        try:
+            with psycopg2.connect(
+                **config.PSQL_CONFIG,
+                database=cls._get_db_name(name)
+            ) as con:
+                con.initialize(logger)
+                with con.cursor() as cursor:
+                    cursor.execute(f"""
+                        SELECT 
+                          CASE 
+                            WHEN NOT EXISTS (
+                              ({student_command})
+                              EXCEPT 
+                              ({true_command})
+                            ) THEN TRUE
+                            ELSE FALSE
+                          END
+                    """)
+                    result = cursor.fetchone()
+                con.rollback()
+        except psycopg2.errors.SyntaxError as e:
+            if 'each EXCEPT query must have the same number of columns' in str(e):
+                raise exceptions.CheckException()
+            raise
+        return result[0]
 
     @classmethod
-    def _delete_from_db(
+    def _check_delete_command(
         cls,
-        db_name: str,
+        name: str,
         student_command: str,
         check_command: str
-    ) -> List[tuple]:
+    ) -> bool:
         """
-        execute query DELTE
-        db_name - database for the query
+        execute query DELETE
+        name - database for the query
         student_command - query sent by the user
         true_command - command that checks changed database
+        return True if deleted row not exist in result.
+
+        Example:
+            student_command: DELETE FROM tasks_task WHERE id IN (25, 35)
+            check_command: SELECT title FROM tasks_task WHERE id IN (25, 35)
         """
+
         with psycopg2.connect(
-            host=config.PSQL_HOST,
-            user=config.PSQL_USER,
-            database=db_name,
-            password=config.PSQL_PASSWORD,
-            port=config.PSQL_PORT
+            **config.PSQL_CONFIG,
+            database=cls._get_db_name(name)
         ) as con:
+            con.initialize(logger)
             with con.cursor() as cursor:
                 cursor.execute(student_command)
                 cursor.execute(f"""
@@ -228,51 +177,182 @@ class PostgresqlService:
                         ELSE FALSE
                       END 
                 """)
-                result = cursor.fetchall()
+                result = cursor.fetchone()
             con.rollback()
-
-        return result
-
+        return result[0]
 
     @classmethod
-    def _update_or_insert_into_db(
+    def _check_update_or_insert_command(
         cls,
-        db_name: str,
+        name: str,
         student_command: str,
-        check_command: str
-    ) -> List[tuple]:
+        check_code: str
+    ) -> bool:
         """
         execute query UPDATE/INSERT
-        db_name - database for the query
+        name - database for the query
         student_command - query sent by the user
-        true_command - select command that checks changed database (1st line is amount of objects returned)
+        check_command - select command that checks changed database
+          (1st line is amount of objects returned)
+        return True if count rows from db equal check_command count
+
+          Example check_command for UPDATE:
+            student_command:
+                UPDATE tasks_task SET title='test' WHERE id=50
+            check_code:
+                1
+                SELECT title FROM tasks_task WHERE id=50 AND title='test
+
+          Example check_command for INSERT:
+            student_command:
+                INSERT INTO tasks_task (title, lang) VALUES ('test', 'psql')
+            check_code:
+                1
+                SELECT title
+                FROM tasks_task
+                WHERE title='test' AND lang = 'psql'
         """
         with psycopg2.connect(
-            host=config.PSQL_HOST,
-            user=config.PSQL_USER,
-            database=db_name,
-            password=config.PSQL_PASSWORD,
-            port=config.PSQL_PORT
+            **config.PSQL_CONFIG,
+            database=cls._get_db_name(name)
         ) as con:
+            con.initialize(logger)
             with con.cursor() as cursor:
-                cursor.execute(student_command)
-                cnt_output = int(check_command.split("\n", 1)[0])
-                check_command = check_command.split("\n", 1)[1]
-                cursor.execute(f"""
-                                SELECT COUNT(*) FROM (
-                                        {check_command}) as FOO
-                            ;""")
-                result = int(cursor.fetchall()[0][0])
-                logger.info(str(result))
-                logger.info(str(cnt_output))
-                if result == cnt_output:
-                    result = [(True,)]
+                try:
+                    expected_rows_count = int(check_code.split("\n", 1)[0])
+                    check_command = check_code.split("\n", 1)[1]
+                except Exception as e:
+                    raise exceptions.InvalidCheckCommand(details=str(e))
                 else:
-                    result = [(False,)]
-            con.rollback()
+                    cursor.execute(student_command)
+                    cursor.execute(
+                        'SELECT COUNT(*) '
+                        f'FROM ({check_command}) AS check_result'
+                    )
+                    rows_count = cursor.fetchone()[0]
+                    con.rollback()
+                    return rows_count == expected_rows_count
 
-        return result
+    @classmethod
+    def _test(
+        cls,
+        check_code: str,
+        name: str,
+        code: str,
+        request_type: SQLCommandType
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        runs a test during testing
+        name: str, query database
+        code: str, user's query
+        check_code: str, code for checking the query result
+        request_type: type of a query SELECT/DELETE/UPDATE/INSERT
+        returns two values: ok and error message """
 
+        ok, error = False, None
+        try:
+            if request_type == SQLCommandType.SELECT:
+                ok = cls._check_select_command(
+                    name=name,
+                    student_command=code,
+                    true_command=check_code
+                )
+            elif request_type == SQLCommandType.DELETE:
+                ok = cls._check_delete_command(
+                    name=name,
+                    student_command=code,
+                    check_command=check_code
+                )
+            else:
+                ok = cls._check_update_or_insert_command(
+                    name=name,
+                    student_command=code,
+                    check_code=check_code
+                )
+        except Exception as e:
+            logger.error(e)
+            ok = False
+            error = str(e)
+        return ok, error
+
+    @classmethod
+    def status(cls, name: str) -> StatusData:
+
+        """ Returns the status of the database with the given name """
+
+        data = StatusData(
+            status=DbStatus.NOT_EXISTS,
+            name=name
+        )
+        try:
+            with psycopg2.connect(**config.PSQL_CONFIG) as con:
+                con.initialize(logger)
+                with con.cursor() as cursor:
+                    cursor.execute(
+                        'SELECT datname '
+                        'FROM pg_database '
+                        'WHERE datname = %(db_name)s',
+                        {'db_name': cls._get_db_name(name)}
+                    )
+                    if cursor.fetchone():
+                        data.status = DbStatus.ACTIVE
+        except Exception as e:
+            logger.error(e)
+            raise exceptions.StatusCheckException(details=str(e))
+        return data
+
+    @classmethod
+    def status_all(cls) -> List[StatusData]:
+
+        """ Returns a list for all sandbox databases with their statuses """
+
+        data = []
+        try:
+            with psycopg2.connect(**config.PSQL_CONFIG) as con:
+                con.initialize(logger)
+                with con.cursor() as cursor:
+                    cursor.execute(
+                        'SELECT split_part(datname, %(db_name_prefix)s, 2) ' 
+                        'FROM pg_database '
+                        'WHERE datname LIKE %(db_name_prefix_template)s',
+                        {
+                            'db_name_prefix': cls.db_name_prefix,
+                            'db_name_prefix_template': f'{cls.db_name_prefix}%'
+                        }
+                    )
+                    result = cursor.fetchall()
+        except Exception as e:
+            logger.error(e)
+            raise exceptions.StatusCheckException(details=str(e))
+        else:
+            for row in result:
+                data.append(
+                    StatusData(
+                        name=row[0],
+                        status=DbStatus.ACTIVE
+                    )
+                )
+            return data
+
+    @classmethod
+    def create(cls, name: str, filename: str):
+        """
+        (Re)creates db from file
+        data.filename: database dump file from directory /files
+        Returns state of the database, 'active' - successfully created,
+        'not exists' - error occurred
+        """
+
+        cls._delete_database(name)
+        cls._create_database(name)
+        cls._load_database_from_file(name=name, filename=filename)
+
+    @classmethod
+    def delete(cls, name: str):
+
+        """ Delete the database with the given name """
+
+        cls._delete_database(name)
 
     @classmethod
     def debug(cls, data: DebugData) -> DebugData:
@@ -281,84 +361,42 @@ class PostgresqlService:
         data.request_typ: 'select'/'something else', meaning DELETE/UPDATE/INSERT
         returns list of bools, corresponding to success or failure of a test
         """
+        result = []
         try:
             with psycopg2.connect(
-                host=config.PSQL_HOST,
-                user=config.PSQL_USER,
-                database=data.name,
-                password=config.PSQL_PASSWORD,
-                port=config.PSQL_PORT
+                **config.PSQL_CONFIG,
+                database=cls._get_db_name(data.name)
             ) as con:
+                con.initialize(logger)
                 with con.cursor() as cursor:
                     cursor.execute(data.code)
                     if cursor.description:
-                        result = [desc[0] for desc in cursor.description]
-                        result = [result]
+                        column_names = [desc[0] for desc in cursor.description]
+                        result.append(column_names)
                         for row in cursor.fetchall():
                             result.append(row)
-                        data.result = tabulate(result)
                 con.rollback()
-
         except Exception as e:
             logger.error(e)
-            data.error = str(e)
-
-        return data
-
-
-    @classmethod
-    def _test(
-        cls,
-        data: TestsData,
-        name: str,
-        code: str,
-        check_code: str,
-        request_type: SQLCommandType
-    ) -> TestsData:
-        """
-        runs a test during testing
-        name: str, query database
-        code: str, user's query
-        check_code: str, code for checking the query result
-        request_type: type of a query - 'select' / 'something else' , meaning DELETE/UPDATE/INSERT
-        returns bool result of the query - success/failure
-        """
-        try:
-            if request_type == SQLCommandType.SELECT:
-                result = cls._select_from_db(name, code, check_code)
-            elif request_type == SQLCommandType.DELETE:
-                result = cls._delete_from_db(name, code, check_code)
+            raise exceptions.ExcecutionException(details=str(e))
+        else:
+            if data.format == DebugFormat.TABULAR:
+                data.result = tabulate(result)
             else:
-                result = cls._update_or_insert_into_db(name, code, check_code)
-            for row in result:
-                for col in row:
-                    if col is True:
-                        data.ok = True
-                        data.result = "True"
-                    else:
-                        data.ok = False
-                        data.result = "False"
-        except Exception as e:
-            logger.error(e)
-            data.error = str(e)
-            data.ok = False
-            data.result = "False"
+                data.result = result
         return data
 
     @classmethod
     def testing(cls, data: TestingData) -> TestingData:
         """
-        runs _test for all items in data.tests (TestsData)
+        runs _test for all items in data.tests (TestData)
         returns results of running all tests
         """
-        for test in data.tests:
-            result = cls._test(
-                data=test,
+        for test_data in data.tests:
+            test_data.ok, test_data.error = cls._test(
+                check_code=test_data.data_in,
                 name=data.name,
                 code=data.code,
-                check_code=test.data_in,
                 request_type=data.request_type
             )
-            test.ok = result.ok
-            test.error = result.error
         return data
