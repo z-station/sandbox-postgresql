@@ -14,7 +14,9 @@ services:
     ports:
       - "9004:9004"
     networks:
-      - docker_localhost
+      - localhost
+    depends_on:
+      - sandbox-postgresql-db
     environment:
       - DEBUG=true
       - PSQL_USER=sandbox
@@ -22,15 +24,18 @@ services:
       - PSQL_PORT=5433
       - PSQL_HOST=sandbox-postgresql-db
     restart: on-failure
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-h", sandbox-postgresql-db]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     command: gunicorn --pythonpath '/app/src' --bind 0:9004 app.main:app --reload -w 1
-    depends_on:
-      - sandbox-postgresql-db
 
   sandbox-postgresql-db:
     container_name: sandbox-postgresql-db
     image: postgres:13
     networks:
-      - docker_localhost
+      - localhost
     volumes:
       - sql_files:/files:ro
       - ../postgresql-data:/var/lib/postgresql/data
@@ -48,7 +53,7 @@ services:
 
 
 networks:
-  docker_localhost:
+  localhost:
     external: true
 
 volumes:
