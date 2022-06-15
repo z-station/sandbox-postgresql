@@ -32,7 +32,7 @@ def create_app():
     def index():
         return render_template("index.html")
 
-    @app.route('/status', methods=['get'])
+    @app.route('/status/', methods=['get'])
     def status():
         try:
             data = PostgresqlService.status_all()
@@ -43,7 +43,7 @@ def create_app():
         else:
             return StatusSchema().dumps(data, many=True)
 
-    @app.route('/status/<name>', methods=['get'])
+    @app.route('/status/<name>/', methods=['get'])
     def status_name(name):
         try:
             data = PostgresqlService.status(name)
@@ -54,7 +54,7 @@ def create_app():
         else:
             return StatusSchema().dump(data)
 
-    @app.route('/create', methods=['post'])
+    @app.route('/create/', methods=['post'])
     def create():
         schema = CreateSchema()
         data = schema.load(request.get_json())
@@ -70,7 +70,7 @@ def create_app():
         else:
             return ''
 
-    @app.route('/delete/<name>', methods=['post'])
+    @app.route('/delete/<name>/', methods=['post'])
     def delete(name):
         try:
             PostgresqlService.delete(name)
