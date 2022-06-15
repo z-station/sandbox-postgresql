@@ -37,7 +37,8 @@ class PostgresqlService:
         con = None
         try:
             con = psycopg2.connect(**config.PSQL_CONFIG)
-            con.initialize(logger)
+            if config.DEBUG:
+                con.initialize(logger)
             con.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
             cursor = con.cursor()
             cursor.execute(
@@ -56,7 +57,8 @@ class PostgresqlService:
         con = None
         try:
             con = psycopg2.connect(**config.PSQL_CONFIG)
-            con.initialize(logger)
+            if config.DEBUG:
+                con.initialize(logger)
             con.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
             cursor = con.cursor()
             cursor.execute(
@@ -121,7 +123,8 @@ class PostgresqlService:
                 **config.PSQL_CONFIG,
                 database=cls._get_db_name(name)
             ) as con:
-                con.initialize(logger)
+                if config.DEBUG:
+                    con.initialize(logger)
                 with con.cursor() as cursor:
                     cursor.execute(f"""
                         SELECT 
@@ -165,7 +168,8 @@ class PostgresqlService:
             **config.PSQL_CONFIG,
             database=cls._get_db_name(name)
         ) as con:
-            con.initialize(logger)
+            if config.DEBUG:
+                con.initialize(logger)
             with con.cursor() as cursor:
                 cursor.execute(student_command)
                 cursor.execute(f"""
@@ -216,7 +220,8 @@ class PostgresqlService:
             **config.PSQL_CONFIG,
             database=cls._get_db_name(name)
         ) as con:
-            con.initialize(logger)
+            if config.DEBUG:
+                con.initialize(logger)
             with con.cursor() as cursor:
                 try:
                     expected_rows_count = int(check_code.split("\n", 1)[0])
@@ -286,7 +291,8 @@ class PostgresqlService:
         )
         try:
             with psycopg2.connect(**config.PSQL_CONFIG) as con:
-                con.initialize(logger)
+                if config.DEBUG:
+                    con.initialize(logger)
                 with con.cursor() as cursor:
                     cursor.execute(
                         'SELECT datname '
@@ -309,7 +315,8 @@ class PostgresqlService:
         data = []
         try:
             with psycopg2.connect(**config.PSQL_CONFIG) as con:
-                con.initialize(logger)
+                if config.DEBUG:
+                    con.initialize(logger)
                 with con.cursor() as cursor:
                     cursor.execute(
                         'SELECT split_part(datname, %(db_name_prefix)s, 2) ' 
@@ -368,7 +375,8 @@ class PostgresqlService:
                 **config.PSQL_CONFIG,
                 database=cls._get_db_name(data.name)
             ) as con:
-                con.initialize(logger)
+                if config.DEBUG:
+                    con.initialize(logger)
                 with con.cursor() as cursor:
                     cursor.execute(data.code)
                     if cursor.description:
