@@ -390,11 +390,12 @@ class PostgresqlService:
             data.error = str(e)
         else:
             if data.format == DebugFormat.TABULAR:
-                data.result = tabulate(
-                    tabular_data=result,
-                    headers=column_names,
-                    tablefmt="psql"
-                )
+                if column_names:
+                    data.result = tabulate(
+                        tabular_data=result,
+                        headers=column_names,
+                        tablefmt="psql"
+                    )
             else:
                 data.result = result
         return data
