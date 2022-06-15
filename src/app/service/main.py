@@ -377,8 +377,7 @@ class PostgresqlService:
                             result.append(row)
                 con.rollback()
         except Exception as e:
-            logger.error(e)
-            raise exceptions.ExcecutionException(details=str(e))
+            data.error = str(e)
         else:
             if data.format == DebugFormat.TABULAR:
                 data.result = tabulate(result)
