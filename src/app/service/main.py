@@ -362,6 +362,7 @@ class PostgresqlService:
         returns list of bools, corresponding to success or failure of a test
         """
         result = []
+        column_names = None
         try:
             with psycopg2.connect(
                 **config.PSQL_CONFIG,
@@ -372,7 +373,8 @@ class PostgresqlService:
                     cursor.execute(data.code)
                     if cursor.description:
                         column_names = [desc[0] for desc in cursor.description]
-                        result.append(column_names)
+                        if data.format == DebugFormat.ARRAY:
+                            result.append(column_names)
                         for row in cursor.fetchall():
                             result.append(row)
                 con.rollback()
@@ -380,7 +382,11 @@ class PostgresqlService:
             data.error = str(e)
         else:
             if data.format == DebugFormat.TABULAR:
-                data.result = tabulate(result)
+                data.result = tabulate(
+                    tabular_data=result,
+                    headers=column_names,
+                    tablefmt="psql"
+                )
             else:
                 data.result = result
         return data
