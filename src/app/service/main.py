@@ -9,7 +9,6 @@ from psycopg2.extensions import (
 from typing import List
 from app.entities import (
     DebugData,
-    TestData,
     TestingData,
     StatusData,
 )
@@ -127,26 +126,26 @@ class PostgresqlService:
                     con.initialize(logger)
                 with con.cursor() as cursor:
                     cursor.execute(f"""
-			SELECT
-			CASE
-			WHEN NOT EXISTS (
-			select *
-			from (
-			({student_command})
-			EXCEPT ALL
-			({true_command})
-			) as first_command
-			UNION ALL
-			select *
-			from (
-			({true_command})
-			EXCEPT ALL
-			({student_command})
-			) as second_command
-			) THEN TRUE
-			ELSE FALSE
-			END
-			""")
+                        SELECT
+                          CASE
+                            WHEN NOT EXISTS (
+                              SELECT *
+                              FROM (
+                                ({student_command})
+                                EXCEPT ALL
+                                ({true_command})
+                              ) AS first_command
+                              UNION ALL
+                              SELECT *
+                              FROM (
+                                ({true_command})
+                                EXCEPT ALL
+                                ({student_command})
+                              ) AS second_command
+                            ) THEN TRUE
+                            ELSE FALSE
+                          END
+                    """)
                     result = cursor.fetchone()
                 con.rollback()
         except psycopg2.errors.SyntaxError as e:
