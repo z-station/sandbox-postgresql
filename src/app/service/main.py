@@ -9,7 +9,6 @@ from psycopg2.extensions import (
 from typing import List
 from app.entities import (
     DebugData,
-    TestData,
     TestingData,
     StatusData,
 )
@@ -127,12 +126,22 @@ class PostgresqlService:
                     con.initialize(logger)
                 with con.cursor() as cursor:
                     cursor.execute(f"""
-                        SELECT 
-                          CASE 
+                        SELECT
+                          CASE
                             WHEN NOT EXISTS (
-                              ({student_command})
-                              EXCEPT 
-                              ({true_command})
+                              SELECT *
+                              FROM (
+                                ({student_command})
+                                EXCEPT ALL
+                                ({true_command})
+                              ) AS first_command
+                              UNION ALL
+                              SELECT *
+                              FROM (
+                                ({true_command})
+                                EXCEPT ALL
+                                ({student_command})
+                              ) AS second_command
                             ) THEN TRUE
                             ELSE FALSE
                           END
